@@ -197,9 +197,25 @@ class Executor:
 
         This is the async entry point for executing async jobs when already in an async context.
         """
+        # Job indices are assigned contiguously by `submit`, so the pending jobs
+        # cover [first_index, first_index + n_jobs).
+        n_jobs = len(self.jobs)
+        first_index = self._jobs_processed - n_jobs
         results = await self._process_jobs()
-        sorted_results = sorted(results, key=lambda x: x[0])
-        return [r[1] for r in sorted_results]
+        results_by_index = dict(results)
+        if len(results_by_index) < n_jobs:
+            logger.warning(
+                "Executor returned %d of %d results (cancelled); "
+                "jobs that did not finish are reported as NaN.",
+                len(results_by_index),
+                n_jobs,
+            )
+        # Keep one entry per submitted job, in submission order, so that
+        # results[k] always belongs to the k-th job even after cancellation.
+        return [
+            results_by_index.get(index, np.nan)
+            for index in range(first_index, first_index + n_jobs)
+        ]
 
     def results(self) -> t.List[t.Any]:
         """

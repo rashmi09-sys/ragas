@@ -215,14 +215,21 @@ if some_condition():
 
 ### Partial Results
 
-When cancellation occurs during execution, you may get partial results:
+When cancellation occurs during execution, you may get partial results.
+`results()` always returns one entry per submitted job, in submission order;
+jobs that did not finish before cancellation are reported as `NaN` (the same
+value used for jobs that failed with `raise_exceptions=False`):
 
 ```py
+import math
+
 executor = evaluate(dataset=dataset, metrics=metrics, return_executor=True)
 
 try:
     results = executor.results()
-    print(f"Completed {len(results)} evaluations")
+    # NaN marks jobs that were cancelled or failed
+    scored = [r for r in results if not (isinstance(r, float) and math.isnan(r))]
+    print(f"Completed {len(scored)} of {len(results)} evaluations")
 except Exception as e:
     if executor.is_cancelled():
         print("Evaluation was cancelled - may have partial results")
